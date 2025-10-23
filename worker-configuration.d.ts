@@ -3,6 +3,8 @@
 // Runtime types generated with workerd@1.20250617.0 2025-10-08 nodejs_compat
 declare namespace Cloudflare {
 	interface Env {
+        CHAT_HISTORY: DurableObjectNamespace<import("./src/worker/index").ChatHistoryObject>;
+        AI: Ai;
 	}
 }
 interface Env extends Cloudflare.Env {}
