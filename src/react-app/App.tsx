@@ -1,185 +1,226 @@
-import React, { useState, FormEvent, ChangeEvent, useEffect, useRef } from 'react';
-import human_pic from './assets/react.svg';
-import ai_pic from './assets/Cloudflare_Logo.svg';
+import React, {
+  useState,
+  FormEvent,
+  ChangeEvent,
+  useEffect,
+  useRef,
+} from "react";
+// 確保您有這兩個檔案，或者換成您自己的圖片路徑
+import human_pic from "./assets/human.jpg";
+import ai_pic from "./assets/computer.jpg";
 
 type Message = {
-    role: 'user' | 'assistant';
-    content: string;
+  role: "user" | "assistant";
+  content: string;
 };
 
 type ApiResponse = {
-    reply: string;
+  reply: string;
 };
 
 function App() {
-    const [userInput, setUserInput] = useState<string>('');
-    const [messages, setMessages] = useState<Message[]>([
-        { role: 'assistant', content: '頂級Ai在此為您服務' }
-    ]);
-    const [loading, setLoading] = useState<boolean>(false);
-    const [sessionId] = useState(() => crypto.randomUUID());
-    const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [userInput, setUserInput] = useState<string>("");
+  const [messages, setMessages] = useState<Message[]>([
+    { role: "assistant", content: "頂級Ai在此為您服務" },
+  ]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [sessionId] = useState(() => crypto.randomUUID());
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    };
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
-    useEffect(() => {
-        console.log(`[App] 元件已掛載。 Session ID: ${sessionId}`);
-    }, [sessionId]);
+  useEffect(() => {
+    console.log(`[App] 元件已掛載。 Session ID: ${sessionId}`);
+  }, [sessionId]);
 
-    useEffect(() => {
-        scrollToBottom();
-    }, [messages]);
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
-    const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
-        setUserInput(e.target.value);
-    };
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setUserInput(e.target.value);
+  };
 
-    const handleSendMessage = async (e: FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        if (!userInput.trim()) return;
+  const handleSendMessage = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!userInput.trim()) return;
 
-        setLoading(true);
-        const text = userInput;
-        const newUserMessage: Message = { role: 'user', content: text };
-        
-        setMessages(prevMessages => [...prevMessages, newUserMessage]);
-        setUserInput('');
+    setLoading(true);
+    const text = userInput;
+    const newUserMessage: Message = { role: "user", content: text };
 
-        console.log(`[App] 正在傳送訊息至 /chat/${sessionId}`, { message: text });
+    setMessages((prevMessages) => [...prevMessages, newUserMessage]);
+    setUserInput("");
 
-        try {
-            const response = await fetch(`/chat/${sessionId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ message: text }),
-            });
+    console.log(`[App] 正在傳送訊息至 /chat/${sessionId}`, { message: text });
 
-            console.log(`[App] 收到原始回應:`, response);
+    try {
+      const response = await fetch(`/chat/${sessionId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message: text }),
+      });
 
-            if (!response.ok) {
-                throw new Error(`HTTP 錯誤! 狀態: ${response.status}`);
-            }
+      console.log(`[App] 收到原始回應:`, response);
 
-            const data = (await response.json()) as ApiResponse;
+      if (!response.ok) {
+        throw new Error(`HTTP 錯誤! 狀態: ${response.status}`);
+      }
 
-            console.log(`[App] 解析後的資料:`, data);
+      const data = (await response.json()) as ApiResponse;
 
-            const newAiMessage: Message = {
-                role: 'assistant',
-                content: data.reply,
-            };
-            setMessages(prevMessages => [...prevMessages, newAiMessage]);
+      console.log(`[App] 解析後的資料:`, data);
 
-        } catch (err) {
-            console.error('[App] 傳送訊息時發生錯誤:', err);
-            const errorAiMessage: Message = {
-                role: 'assistant',
-                content: '抱歉，發生錯誤，請稍後再試。',
-            };
-            setMessages(prevMessages => [...prevMessages, errorAiMessage]);
-        } finally {
-            setLoading(false);
-            console.log("[App] 訊息流程結束。");
-        }
-    };
+      const newAiMessage: Message = {
+        role: "assistant",
+        content: data.reply,
+      };
+      setMessages((prevMessages) => [...prevMessages, newAiMessage]);
+    } catch (err) {
+      console.error("[App] 傳送訊息時發生錯誤:", err);
+      const errorAiMessage: Message = {
+        role: "assistant",
+        content: "抱歉，發生錯誤，請稍後再試。",
+      };
+      setMessages((prevMessages) => [...prevMessages, errorAiMessage]);
+    } finally {
+      setLoading(false);
+      console.log("[App] 訊息流程結束。");
+    }
+  };
 
-    return (
-        <>
-            <div className="absolute right-0 top-0 -z-50 h-screen w-screen bg-[url('./assets/bg.jpg')] bg-cover bg-fixed bg-center bg-no-repeat"></div>
-            
-            {/* <DocUploader /> */}
-            
-            <section className="flex flex-col items-center justify-center h-screen">
-                <div className="w-4/5 h-3/4 bg-gray-200 rounded-lg container relative min-w-[450px] overflow-y-auto border-2 pb-4">
-                    <div className="h-[60px] bg-gray-500 mx-auto flex sticky top-0 w-full mb-8 z-10">
-                        <div className="text-3xl mx-auto text-center font-semibold place-self-center">
-                            Cloudflare AI 聊天室
-                        </div>
+  return (
+    <>
+      <div className="absolute right-0 top-0 -z-50 h-screen w-screen bg-[url('./assets/bg.jpg')] bg-cover bg-fixed bg-center bg-no-repeat"></div>
+
+      {/* <DocUploader /> */}
+
+      <section className="flex flex-col items-center justify-center h-screen">
+        <div className="w-4/5 h-3/4 bg-gray-200 rounded-lg container relative min-w-[450px] overflow-y-auto border-2 pb-4">
+          <div className="h-[60px] bg-gray-500 mx-auto flex sticky top-0 w-full mb-8 z-10">
+            <div className="text-3xl mx-auto text-center font-semibold place-self-center">
+              Cloudflare AI 聊天室
+            </div>
+          </div>
+
+          <div className="px-4">
+            {messages.map((message, index) => (
+              <div key={index}>
+                {message.role === "user" && (
+                  // --- CSS 修正 ---
+                  // 1. "item-center" 改為 "items-start" (頂部對齊)
+                  <div className="mr-2 mb-2 flex flex-row justify-end font-bold items-start">
+                    <div
+                      style={{ whiteSpace: "pre-wrap" }}
+                      className="flex items-center mb-2 mr-2 max-w-[65%] rounded-l-3xl rounded-tr-xl bg-gradient-to-r from-sky-500/80 to-blue-500/70 px-3 py-2 text-white"
+                    >
+                      {message.content}
                     </div>
-                    
-                    <div className="px-4">
-                        {messages.map((message, index) => (
-                            <div key={index}>
-                                {message.role === 'user' && (
-                                    <div className="mr-2 mb-2 item-center flex flex-row justify-end font-bold">
-                                        <div style={{ whiteSpace: 'pre-wrap' }} className="flex item-center mb-2 mr-2 max-w-[65%] rounded-l-3xl rounded-tr-xl bg-gradient-to-r from-sky-500/80 to-blue-500/70 px-3 py-2 text-white">
-                                            {message.content}
-                                        </div>
-                                        <img alt="user" className="h-10 w-10 rounded-full object-cover" src={human_pic} />
-                                    </div>
-                                )}
-                                {message.role === 'assistant' && (
-                                    <div className="ml-2 mb-6 item-center flex flex-row justify-start font-bold">
-                                        <img alt="ai" className="h-10 w-10 rounded-full object-cover" src={ai_pic} />
-                                        <div style={{ whiteSpace: 'pre-wrap' }} className="ml-2 rounded-r-3xl rounded-tl-xl bg-gray-400 px-3 py-2 text-white max-w-[65%]">
-                                            {message.content}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                        
-                        {loading && (
-                            <div className="flex items-center justify-center">
-                                <div className="mx-auto" role="status">
-                                    <svg aria-hidden="true" className="w-8 h-8 mr-2 text-gray-200 animate-spin dark:text-gray-600 fill-blue-600" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" fill="currentColor"/>
-                                        <path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="currentFill"/>
-                                    </svg>
-                                    <span className="sr-only">Loading...</span>
-                                </div>
-                            </div>
-                        )}
-                        
-                        <div ref={messagesEndRef} />
+                    <img
+                      alt="user"
+                      // 2. 加入 "flex-shrink-0" 防止圖片被壓縮
+                      className="h-10 w-10 rounded-full object-cover flex-shrink-0"
+                      src={human_pic}
+                    />
+                  </div>
+                )}
+                {message.role === "assistant" && (
+                  // --- CSS 修正 ---
+                  // 1. "item-center" 改為 "items-start" (頂部對齊)
+                  <div className="ml-2 mb-6 flex flex-row justify-start font-bold items-start">
+                    <img
+                      alt="ai"
+                      // 2. 加入 "flex-shrink-0" 防止圖片被壓縮
+                      className="h-10 w-10 rounded-full object-cover flex-shrink-0"
+                      src={ai_pic}
+                    />
+                    <div
+                      style={{ whiteSpace: "pre-wrap" }}
+                      className="ml-2 rounded-r-3xl rounded-tl-xl bg-gray-400 px-3 py-2 text-white max-w-[65%]"
+                    >
+                      {message.content}
                     </div>
-                </div>
+                  </div>
+                )}
+              </div>
+            ))}
 
-                <div className="mt-6 mx-auto z-0 flex h-[4rem] w-[70%] flex-row items-center rounded-xl bg-zinc-200 px-4">
-                    <form className="px-6 mx-auto flex w-full" onSubmit={handleSendMessage}>
-                        <input
-                            className="ml-4 lg:ml-8 mr-2 w-3/4 shrink rounded border border-gray-300 p-2 focus:border-blue-500 focus:outline-none"
-                            id="content"
-                            placeholder="Message"
-                            type="text"
-                            value={userInput}
-                            onChange={handleInputChange}
-                            disabled={loading}
-                        />
-                        <div className="ml-4 flex flex-none items-center">
-                            <button
-                                className="flex shrink-0 items-center justify-center rounded-xl bg-indigo-500 px-4 py-1 text-white hover:bg-indigo-600 disabled:bg-indigo-300"
-                                type="submit"
-                                disabled={loading}
-                            >
-                                <span>Send</span>
-                                <span className="ml-2">
-                                    <svg
-                                        className="-mt-px h-4 w-4 rotate-45"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                    >
-                                        <path
-                                            d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth="2"
-                                        />
-                                    </svg>
-                                </span>
-                            </button>
-                        </div>
-                    </form>
+            {loading && (
+              <div className="flex items-center justify-center">
+                <div className="mx-auto" role="status">
+                  <svg
+                    aria-hidden="true"
+                    className="w-8 h-8 mr-2 text-gray-200 animate-spin dark:text-gray-600 fill-blue-600"
+                    viewBox="0 0 100 101"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z"
+                      fill="currentColor"
+                    />
+                    <path
+                      d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z"
+                      fill="currentFill"
+                    />
+                  </svg>
+                  <span className="sr-only">Loading...</span>
                 </div>
-            </section>
-        </>
-    );
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+        </div>
+
+        <div className="mt-6 mx-auto z-0 flex h-[4rem] w-[70%] flex-row items-center rounded-xl bg-zinc-200 px-4">
+          <form
+            className="px-6 mx-auto flex w-full"
+            onSubmit={handleSendMessage}
+          >
+            <input
+              className="ml-4 lg:ml-8 mr-2 w-3/4 shrink rounded border border-gray-300 p-2 focus:border-blue-500 focus:outline-none"
+              id="content"
+              placeholder="Message"
+              type="text"
+              value={userInput}
+              onChange={handleInputChange}
+              disabled={loading}
+            />
+            <div className="ml-4 flex flex-none items-center">
+              <button
+                className="flex shrink-0 items-center justify-center rounded-xl bg-indigo-500 px-4 py-1 text-white hover:bg-indigo-600 disabled:bg-indigo-300"
+                type="submit"
+                disabled={loading}
+              >
+                <span>Send</span>
+                <span className="ml-2">
+                  <svg
+                    className="-mt-px h-4 w-4 rotate-45"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                    />
+                  </svg>
+                </span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+    </>
+  );
 }
 
 export default App;
