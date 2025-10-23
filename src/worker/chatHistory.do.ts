@@ -12,6 +12,7 @@ export class ChatHistoryObject extends DurableObject {
         this.env = env;
         this.msgHistory = [];
         
+        // 啟動時載入持久化的歷史紀錄
         this.ctx.storage.get("history").then(history => {
             this.msgHistory = (history as CoreMessage[]) || [];
             console.log(`[DO] ${this.ctx.id} 啟動，載入了 ${this.msgHistory.length} 則歷史訊息。`);
@@ -29,6 +30,7 @@ export class ChatHistoryObject extends DurableObject {
         }
     }
 
+    // --- 這就是更新後的函式 ---
     async handleHttpRequest(request: Request): Promise<Response> {
         if (request.method === "POST") {
             try {
@@ -36,11 +38,28 @@ export class ChatHistoryObject extends DurableObject {
                 console.log(`[DO] ${this.ctx.id} 收到 HTTP 訊息: "${message}"`);
 
                 this.msgHistory.push({ role: 'user', content: message });
+
+                // --- 這是新的 AI 呼叫邏輯 ---
+                console.log(`[DO] ${this.ctx.id} 正在為 HTTP 請求呼叫 AI...`);
+                const workersai = createWorkersAI({ binding: this.env.AI });
                 
-                const aiResponseContent = `AI received HTTP text: '${message}'`;
+                const result = streamText({
+                    model: workersai('@cf/meta/llama-3.1-8b-instruct'),
+                    system: 'You are a helpful assistant.', // 文字聊天的 system prompt
+                    messages: this.msgHistory,
+                });
+
+                // 因為是 HTTP，我們收集完整的 AI 回覆，而不是串流
+                let aiResponseContent = '';
+                for await (const chunk of result.textStream) {
+                    aiResponseContent += chunk;
+                }
+                
+                console.log(`[DO] ${this.ctx.id} 收到 AI 完整回覆: "${aiResponseContent}"`);
+                // --- AI 呼叫邏輯結束 ---
+
                 this.msgHistory.push({ role: 'assistant', content: aiResponseContent });
 
-                // --- 要求的日誌 ---
                 console.log(`[DO] ${this.ctx.id} 目前完整 HTTP 歷史:`, JSON.stringify(this.msgHistory, null, 2));
                 
                 await this.ctx.storage.put("history", this.msgHistory);
@@ -58,6 +77,7 @@ export class ChatHistoryObject extends DurableObject {
         return new Response("Method Not Allowed", { status: 405 });
     }
 
+    // --- WebSocket 函式保持不變 ---
     async handleWebSocket(request: Request): Promise<Response> {
         const webSocketPair = new WebSocketPair();
         const [socket, ws] = Object.values(webSocketPair);
@@ -111,7 +131,6 @@ export class ChatHistoryObject extends DurableObject {
 
             this.msgHistory.push({ role: 'assistant', content: fullReply });
 
-            // --- 要求的日誌 ---
             console.log(`[DO] ${this.ctx.id} 目前完整 WS 歷史:`, JSON.stringify(this.msgHistory, null, 2));
 
             await this.ctx.storage.put("history", this.msgHistory);
