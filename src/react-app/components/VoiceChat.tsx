@@ -2,9 +2,20 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMicVAD } from "@ricky0123/vad-react";
+// import * as vadReact from "@ricky0123/vad-react";
 import { encodeWavPCM16 } from "../lib/wav";
 import { b64ToBlob, sniffAudioMime, waitFor, waitForOpen } from "../lib/utils";
 import VoiceVisualStatus from "./VoiceVisualStatus";
+
+// --- 新增部分：一個簡單的函式來取得或建立 sessionId ---
+function getSessionId(): string {
+let sessionId = localStorage.getItem("sessionId");
+if (!sessionId) {
+    sessionId = crypto.randomUUID();
+    localStorage.setItem("sessionId", sessionId);
+}
+return sessionId;
+}
 
 // TypeScript declarations for browser compatibility
 declare global {
@@ -34,23 +45,34 @@ const [listening, setListening] = useState(false);
 const [playbackEl, setPlaybackEl] = useState<HTMLAudioElement | null>(null);
 const [aiSpeaking, setAiSpeaking] = useState(false);
 const [audioCtx, setAudioCtx] = useState<AudioContext | null>(null);
+
+// --- 新增部分：用 state 來保存 sessionId ---
+const [sessionId, setSessionId] = useState<string | null>(null);
+
 const pendingTtsRef = useRef(0);
 const serverReadyRef = useRef(false);
-
 const wsRef = useRef<WebSocket | null>(null);
 const audioQueueRef = useRef<Blob[]>([]);
 const isPlayingRef = useRef(false);
 const chatContainerRef = useRef<HTMLDivElement>(null);
 
-// --- 關鍵修改：使用 Vite 的環境變數 ---
-const serverUrl = useMemo(() => {
-    if (typeof window === "undefined") return "";
-    const proto = location.protocol === "https:" ? "wss" : "ws";
-    // 從 import.meta.env 讀取，而不是 process.env
-    return `${proto}://${import.meta.env.VITE_WS_HOST}/websocket`;
+// --- 新增部分：在元件載入時取得 sessionId ---
+useEffect(() => {
+    setSessionId(getSessionId());
 }, []);
 
+
+// --- 修改部分：修改 serverUrl 的產生邏輯 ---
+const serverUrl = useMemo(() => {
+    if (typeof window === "undefined" || !sessionId) return "";
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    // 將 sessionId 加入到 URL 路徑中
+    return `${proto}://${import.meta.env.VITE_WS_HOST}/chat/${sessionId}`;
+}, [sessionId]); // 依賴 sessionId
+
 const vad = useMicVAD({
+    onnxWASMBasePath:"https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/",
+    baseAssetPath:"https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.27/dist/",
     startOnLoad: false,
     onSpeechStart: () => setStatus("Listening…"),
     onSpeechEnd: (audio) => {
@@ -126,13 +148,18 @@ const enqueueAudio = (blob: Blob) => {
 };
 
 const connect = () => {
-    if (!serverUrl) return;
+    if (!serverUrl) {
+        console.error("WebSocket URL is not ready.");
+        return;
+    };
     if (
     wsRef.current &&
     (wsRef.current.readyState === WebSocket.OPEN ||
         wsRef.current.readyState === WebSocket.CONNECTING)
     )
     return;
+    
+    console.log(`Connecting to: ${serverUrl}`); // 方便你除錯
     const ws = new WebSocket(serverUrl);
     ws.binaryType = "arraybuffer";
 
@@ -221,6 +248,7 @@ const onStop = () => {
 const onClear = () => {
     setMessages([]);
     setStatus("");
+    // 你的 DO 設計是透過刪除 storage 來清空歷史，前端發送一個指令
     wsRef.current?.send(JSON.stringify({ type: "cmd", data: "clear" }));
     audioQueueRef.current = [];
     isPlayingRef.current = false;
@@ -231,15 +259,14 @@ useEffect(() => {
     vad.pause();
     disconnect();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
 }, []);
 
-// UI (JSX) 部分保持不變，你可以根據你的需求修改
+// JSX 部分保持不變...
 return (
-    <div className="flex flex-col gap-4 p-4 max-w-2xl mx-auto">
+    <div className="flex flex-col gap-4 p-4 max-w-2xl mx-auto bg-white shadow-lg rounded-lg">
     <div
         ref={chatContainerRef}
-        className="rounded-xl border bg-white p-4 h-[420px] overflow-y-auto"
+        className="rounded-xl border bg-gray-50 p-4 h-[420px] overflow-y-auto"
     >
         {messages.length === 0 ? (
         <div className="text-sm text-gray-400">
@@ -284,11 +311,11 @@ return (
     <div className="flex items-center gap-3">
         <button
         onClick={onStart}
-        disabled={listening}
-        className={`rounded-lg px-4 py-2 font-medium ${
-            listening
+        disabled={listening || !sessionId} // 當 sessionId 還沒準備好時也禁用
+        className={`rounded-lg px-4 py-2 font-medium transition-colors ${
+            listening || !sessionId
             ? "bg-gray-400 cursor-not-allowed"
-            : "bg-green-600 hover:opacity-90 active:scale-95"
+            : "bg-green-600 hover:bg-green-700 active:scale-95"
         } text-white shadow`}
         >
         Start Conversation
@@ -297,10 +324,10 @@ return (
         <button
         onClick={onStop}
         disabled={!listening}
-        className={`rounded-lg px-4 py-2 font-medium ${
+        className={`rounded-lg px-4 py-2 font-medium transition-colors ${
             !listening
             ? "bg-gray-400 cursor-not-allowed"
-            : "bg-red-600 hover:opacity-90 active:scale-95"
+            : "bg-red-600 hover:bg-red-700 active:scale-95"
         } text-white shadow`}
         >
         Stop Conversation
@@ -308,7 +335,7 @@ return (
 
         <button
         onClick={onClear}
-        className="ml-auto rounded-lg px-4 py-2 font-medium bg-gray-700 text-white shadow hover:opacity-90 active:scale-95"
+        className="ml-auto rounded-lg px-4 py-2 font-medium bg-gray-700 text-white shadow hover:bg-gray-800 active:scale-95"
         >
         Clear Chat
         </button>
