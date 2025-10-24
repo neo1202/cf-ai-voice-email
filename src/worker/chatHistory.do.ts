@@ -83,60 +83,99 @@ export class ChatHistoryObject extends DurableObject {
         const [socket, ws] = Object.values(webSocketPair);
 
         ws.accept();
+        console.log(`[DO] ${this.ctx.id} WebSocket 連線成功建立。`);
         ws.send(JSON.stringify({ type: 'status', text: 'ready' }));
         const workersai = createWorkersAI({ binding: this.env.AI });
         const queue = new PQueue({ concurrency: 1 });
 
         ws.addEventListener('message', async (event) => {
-            if (typeof event.data === 'string') {
-                const { type, data } = JSON.parse(event.data);
-                console.log(`[DO] ${this.ctx.id} 收到 WS 指令: ${type} - ${data}`);
-                if (type === 'cmd' && data === 'clear') {
-                    this.msgHistory = [];
-                    await this.ctx.storage.delete("history");
-                    ws.send(JSON.stringify({ type: 'status', text: 'History cleared' }));
+            try {
+                // DO 日誌 #2: 確認收到訊息，並檢查類型和大小
+                console.log(`[DO] ${this.ctx.id} 收到 WS 訊息，類型: ${event.data instanceof ArrayBuffer ? 'ArrayBuffer' : typeof event.data}, 大小: ${(event.data as ArrayBuffer).byteLength ?? 'N/A'}`);
+
+                if (typeof event.data === 'string') {
+                    const { type, data } = JSON.parse(event.data);
+                    console.log(`[DO] ${this.ctx.id} 收到 WS 指令: ${type} - ${data}`);
+                    if (type === 'cmd' && data === 'clear') {
+                        this.msgHistory = [];
+                        await this.ctx.storage.delete("history");
+                        ws.send(JSON.stringify({ type: 'status', text: 'History cleared' }));
+                    }
+                    return;
                 }
-                return;
-            }
+                
+                // DO 日誌 #3: 準備呼叫 Whisper
+                console.log(`[DO] ${this.ctx.id} 正在呼叫 Whisper 進行語音轉文字...`);
 
-            const { text } = await this.env.AI.run('@cf/openai/whisper-tiny-en', {
-                audio: [...new Uint8Array(event.data as ArrayBuffer)],
-            });
-            console.log(`[DO] ${this.ctx.id} STT 結果: "${text}"`);
-            ws.send(JSON.stringify({ type: 'text', text }));
-            this.msgHistory.push({ role: 'user', content: text });
-
-            console.log(`[DO] ${this.ctx.id} 正在開始 AI 串流...`);
-            const result = streamText({
-                model: workersai('@cf/meta/llama-3.1-8b-instruct'),
-                system: 'You are a helpful assistant in a voice conversation.',
-                messages: this.msgHistory,
-            });
-
-            let fullReply = '';
-            for await (const chunk of result.textStream) {
-                const sentence = String(chunk).trim();
-                if (!sentence) continue;
-                fullReply += (fullReply ? ' ' : '') + sentence;
-                ws.send(JSON.stringify({ type: 'status', text: 'Speaking…' }));
-
-                void queue.add(async () => {
-                    const tts = await this.env.AI.run('@cf/myshell-ai/melotts', { prompt: sentence });
-                    const b64 = btoa(String.fromCharCode(...new Uint8Array(tts as ArrayBuffer)));
-                    ws.send(JSON.stringify({ type: 'audio', text: sentence, audio: b64 }));
+                const { text } = await this.env.AI.run('@cf/openai/whisper-tiny-en', {
+                    audio: [...new Uint8Array(event.data as ArrayBuffer)],
                 });
+                
+                // DO 日誌 #4: Whisper 成功，回傳結果
+                console.log(`[DO] ${this.ctx.id} ✅ STT 成功! 結果: "${text}"`);
+
+                // 為了專注於核心問題，我們先把結果發回去，暫時不呼叫 LLM
+                ws.send(JSON.stringify({ type: 'userTranscript', transcript: text }));
+                this.msgHistory.push({ role: 'user', content: text });
+
+                // --- 為了簡化偵錯，暫時註解掉後續的 LLM 和 TTS 流程 ---
+                // 只要你能看到上面的日誌 #4，就代表核心功能通了！
+                
+                console.log(`[DO] ${this.ctx.id} 偵錯完成，核心流程通暢！`);
+                ws.send(JSON.stringify({ type: 'status', text: 'Idle' }));
+                            console.log(`[DO] ${this.ctx.id} 正在開始 AI 串流...`);
+                const result = streamText({
+                    model: workersai('@cf/meta/llama-3.1-8b-instruct'),
+                    system: 'You are a helpful assistant in a voice conversation with the user',
+                    messages: this.msgHistory,
+                    maxTokens: 160, // You can adjust this
+                    temperature: 0.7, // You can adjust this
+                    // IMPORTANT: This is the part that chunks the stream into sentences
+                    experimental_transform: smoothStream({
+                        delayInMs: null, // No artificial delay
+                        chunking: (buf: string) => {
+                            // Emit a sentence if we see ., !, ? followed by space or end-of-string
+                            const m = buf.match(/^(.+?[.!?])(?:\s+|$)/);
+                            if (m) return m[0];
+                            // As a fallback, emit a clause if it’s getting too long
+                            if (buf.length > 120) return buf;
+                            // Otherwise, keep buffering
+                            return null;
+                        },
+                    }),
+                });
+
+                let fullReply = '';
+                for await (const chunk of result.textStream) {
+                    const sentence = String(chunk).trim();
+                    if (!sentence) continue;
+                    fullReply += (fullReply ? ' ' : '') + sentence;
+                    ws.send(JSON.stringify({ type: 'status', text: 'Speaking…' }));
+
+                    void queue.add(async () => {
+                        const tts = await this.env.AI.run('@cf/myshell-ai/melotts', { prompt: sentence });
+                        const b64 = btoa(String.fromCharCode(...new Uint8Array(tts as ArrayBuffer)));
+                        ws.send(JSON.stringify({ type: 'audio', text: sentence, audio: b64 }));
+                        console.log(`[DO] ${this.ctx.id} ✅ 音訊已發送! Text: "${sentence}", Audio size: ${b64.length}`);
+                    });
+                }
+
+                await queue.onIdle();
+
+                this.msgHistory.push({ role: 'assistant', content: fullReply });
+
+                console.log(`[DO] ${this.ctx.id} 目前完整 WS 歷史:`, JSON.stringify(this.msgHistory, null, 2));
+
+                await this.ctx.storage.put("history", this.msgHistory);
+                console.log(`[DO] ${this.ctx.id} 已儲存 WS 歷史。`);
+
+                ws.send(JSON.stringify({ type: 'status', text: 'Idle' }));
+                
+            } catch (error) {
+                // DO 日誌 #5 (錯誤): 如果任何地方出錯，這裡會捕捉到
+                console.error(`[DO] ${this.ctx.id} ❌ 處理訊息時發生嚴重錯誤:`, error);
+                ws.send(JSON.stringify({ type: 'status', text: `Error: ${(error as Error).message}` }));
             }
-
-            await queue.onIdle();
-
-            this.msgHistory.push({ role: 'assistant', content: fullReply });
-
-            console.log(`[DO] ${this.ctx.id} 目前完整 WS 歷史:`, JSON.stringify(this.msgHistory, null, 2));
-
-            await this.ctx.storage.put("history", this.msgHistory);
-            console.log(`[DO] ${this.ctx.id} 已儲存 WS 歷史。`);
-
-            ws.send(JSON.stringify({ type: 'status', text: 'Idle' }));
         });
 
         ws.addEventListener('close', () => {

@@ -90,12 +90,12 @@ useEffect(() => {
 
 async function unlockAudio(): Promise<AudioContext | null> {
     try {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return null;
-    const ctx: AudioContext = window.__vcCtx ?? new AC();
-    window.__vcCtx = ctx;
-    if (ctx.state !== "running") await ctx.resume();
-    return ctx;
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        const ctx: AudioContext = window.__vcCtx ?? new AC();
+        window.__vcCtx = ctx;
+        if (ctx.state !== "running") await ctx.resume();
+        return ctx;
     } catch {
     return null;
     }
@@ -115,29 +115,32 @@ const playNext = () => {
     setPlaybackEl(a);
 
     a.onplaying = () => {
-    setAiSpeaking(true);
-    setStatus("Speaking…");
+        setAiSpeaking(true);
+        setStatus("Speaking…");
     };
     a.onwaiting = () => setStatus("Buffering audio…");
     a.onended = () => {
-    URL.revokeObjectURL(url);
-    isPlayingRef.current = false;
-    pendingTtsRef.current = Math.max(0, pendingTtsRef.current - 1);
-    if (pendingTtsRef.current <= 0 && audioQueueRef.current.length === 0) {
-        setAiSpeaking(false);
-        setStatus(listening ? "Listening…" : "Idle");
-    }
-    playNext();
+        console.log("▶playNext: Audio playback ended.");
+        URL.revokeObjectURL(url);
+        isPlayingRef.current = false;
+        pendingTtsRef.current = Math.max(0, pendingTtsRef.current - 1);
+        if (pendingTtsRef.current <= 0 && audioQueueRef.current.length === 0) {
+            setAiSpeaking(false);
+            setStatus(listening ? "Listening…" : "Idle");
+        }
+        playNext();
     };
-    a.onerror = () => {
-    URL.revokeObjectURL(url);
-    isPlayingRef.current = false;
-    pendingTtsRef.current = Math.max(0, pendingTtsRef.current - 1);
-    playNext();
+    a.onerror = (e) => {
+        console.error("Audio Playback Error:", e);
+        URL.revokeObjectURL(url);
+        isPlayingRef.current = false;
+        pendingTtsRef.current = Math.max(0, pendingTtsRef.current - 1);
+        playNext();
     };
 
     a.play().catch((err) => {
-    setStatus(`Playback blocked: ${String(err)}`);
+        console.error("a.play() was rejected!", err);
+        setStatus(`Playback blocked: ${String(err)}`);
     });
 };
 
@@ -174,11 +177,12 @@ const connect = () => {
     ws.onerror = () => setStatus("WebSocket error");
 
     ws.onmessage = (ev) => {
-    if (typeof ev.data !== "string") return;
-    let msg: WebSocketMessage;
-    try {
-        msg = JSON.parse(ev.data);
-    } catch {
+        console.log(" [WebSocket MSG Received]:", ev.data);
+        if (typeof ev.data !== "string") return;
+        let msg: WebSocketMessage;
+        try {
+            msg = JSON.parse(ev.data);
+        } catch {
         return;
     }
 
