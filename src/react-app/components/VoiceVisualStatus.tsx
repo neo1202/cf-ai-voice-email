@@ -1,6 +1,6 @@
 // src/components/VoiceVisualStatus.tsx
 
-import React, { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 type Props = {
 mode?: "mic" | "playback";
