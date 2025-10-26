@@ -10,10 +10,10 @@ export default defineConfig({
         
     ],
     server: {
-        headers: {
-            "Cross-Origin-Embedder-Policy": "require-corp",
-            "Cross-Origin-Opener-Policy": "same-origin",
-        },
+        // headers: {
+        //     "Cross-Origin-Embedder-Policy": "require-corp",
+        //     "Cross-Origin-Opener-Policy": "same-origin",
+        // },
         proxy: {
             // 這會將所有 /chat 開頭的請求
             // 代理到您本地運行的 wrangler dev 伺服器

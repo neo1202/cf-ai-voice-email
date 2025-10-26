@@ -24,5 +24,9 @@
             "name": "CHAT_HISTORY"
             }
         ]
+    },
+    "assets": {
+        "directory": "./dist/client",
+        "not_found_handling": "single-page-application"
     }
 }
