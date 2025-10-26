@@ -59,7 +59,8 @@ export default function VoiceChat() {
         if (typeof window === "undefined" || !sessionId) return "";
         const proto = location.protocol === "https:" ? "wss" : "ws";
         console.log(`${proto}://${import.meta.env.VITE_WS_HOST}/chat/${sessionId}`);
-        return `${proto}://${import.meta.env.VITE_WS_HOST}/chat/${sessionId}`;
+        // return `${proto}://${import.meta.env.VITE_WS_HOST}/chat/${sessionId}`;
+        return `${proto}://${import.meta.env.VITE_WS_HOST}/websocket`;
     }, [sessionId]);
 
     const vad = useMicVAD({
