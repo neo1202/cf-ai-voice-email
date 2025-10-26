@@ -78,7 +78,7 @@ export class ChatHistoryObject extends DurableObject {
     }
 
     // --- WebSocket 函式保持不變 ---
-    async handleWebSocket(request: Request): Promise<Response> {
+    async handleWebSocket(_request: Request): Promise<Response> {
         const webSocketPair = new WebSocketPair();
         const [socket, ws] = Object.values(webSocketPair);
 

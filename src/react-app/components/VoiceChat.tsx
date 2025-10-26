@@ -295,7 +295,7 @@ export default function VoiceChat() {
                 : "bg-green-600 hover:bg-green-700 active:scale-95"
             } text-white shadow`}
             >
-            Start Conversation
+            Start
             </button>
     
             <button
@@ -307,14 +307,14 @@ export default function VoiceChat() {
                 : "bg-red-600 hover:bg-red-700 active:scale-95"
             } text-white shadow`}
             >
-            Stop Conversation
+            Stop
             </button>
 
             <div className="ml-auto flex items-center gap-3">
             {/* 按鈕 1: 清除當前對話 */}
                 <button
                     onClick={onClear}
-                    className="rounded-lg px-4 py-2 font-medium bg-yellow-600 text-white shadow hover:bg-yellow-700 active:scale-95"
+                    className="rounded-lg px-4 py-2 font-medium bg-cyan-600 text-white shadow hover:bg-cyan-700 active:scale-95"
                 >
                     Clear Chat
                 </button>
