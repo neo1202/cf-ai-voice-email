@@ -27,8 +27,12 @@ type ChatMsg = { role: Role; content: string };
 
 type WebSocketMessage =
     | { type: "status"; text: string }
-    | { type: "transcript"; text: string } // 使用 'transcript' 來區分使用者的逐字稿
-    | { type: "assistant"; text?: string; audio?: string }; // 統一 AI 回覆
+    | { type: "text" | "transcript"; text: string }
+    | {
+        type: "audio" | "assistant";
+        text?: string;
+        audio?: string | { audio: string };
+        };
 
 export default function VoiceChat() {
     const [messages, setMessages] = useState<ChatMsg[]>([]);
@@ -40,6 +44,7 @@ export default function VoiceChat() {
     const [audioCtx, setAudioCtx] = useState<AudioContext | null>(null);
     const [sessionId, setSessionId] = useState<string | null>(null);
 
+    const pendingTtsRef = useRef(0);
     const serverReadyRef = useRef(false);
     const wsRef = useRef<WebSocket | null>(null);
     const audioQueueRef = useRef<Blob[]>([]);
@@ -68,6 +73,20 @@ export default function VoiceChat() {
             wsRef.current?.send(wav);
         },
     });
+    const uiStatus = aiSpeaking
+    ? "Speaking…"
+    : vad.loading
+    ? "Loading VAD…"
+    : !listening
+    ? "Idle"
+    : vad.userSpeaking
+    ? "User speaking"
+    : "Listening";
+
+    useEffect(
+        () => setStatus(uiStatus),
+        [uiStatus, aiSpeaking, vad.loading, vad.userSpeaking, listening]
+    );
 
     useEffect(() => {
         if (chatContainerRef.current) {
@@ -101,37 +120,55 @@ export default function VoiceChat() {
         const a = new Audio(url);
         setPlaybackEl(a);
 
-        a.onplaying = () => setAiSpeaking(true);
+        a.onplaying = () => {
+            setAiSpeaking(true);
+            setStatus("Speaking…");
+        };
+        a.onwaiting = () => setStatus("Buffering audio…");
         a.onended = () => {
             URL.revokeObjectURL(url);
             isPlayingRef.current = false;
-            playNext(); // 播放完畢，自動播放下一個
+            pendingTtsRef.current = Math.max(0, pendingTtsRef.current - 1);
+            if (pendingTtsRef.current <= 0 && audioQueueRef.current.length === 0) {
+                setAiSpeaking(false);
+                setStatus(listening ? "Listening…" : "Idle");
+            }
+            playNext();
         };
         a.onerror = (e) => {
             console.error("Audio Playback Error:", e);
             URL.revokeObjectURL(url);
             isPlayingRef.current = false;
+            pendingTtsRef.current = Math.max(0, pendingTtsRef.current - 1);
             playNext(); // 即使出錯，也要繼續播放下一個
         };
 
         a.play().catch((err) => {
             console.error("a.play() was rejected!", err);
-            a.onerror?.(new Event('error')); // 手動觸發 onerror 來清理
+            setStatus(`Playback blocked: ${String(err)}`);
+            // a.onerror?.(new Event('error')); // 手動觸發 onerror 來清理
         });
     };
 
-    const enqueueAudio = (b64: string) => {
-        if (!b64 || b64.length === 0) {
-            console.warn("Received empty audio data, skipping enqueue.");
-            return;
-        }
-        const mime = sniffAudioMime(b64);
-        const blob = b64ToBlob(b64, mime);
+    // const enqueueAudio = (b64: string) => {
+    //     if (!b64 || b64.length === 0) {
+    //         console.warn("Received empty audio data, skipping enqueue.");
+    //         return;
+    //     }
+    //     const mime = sniffAudioMime(b64);
+    //     const blob = b64ToBlob(b64, mime);
+    //     audioQueueRef.current.push(blob);
+    //     playNext(); // 每次有新音訊加入就嘗試播放
+    // };
+    const enqueueAudio = (blob: Blob) => {
         audioQueueRef.current.push(blob);
-        playNext(); // 每次有新音訊加入就嘗試播放
+        pendingTtsRef.current += 1; // we have one more chunk to play
+        playNext();
     };
 
+
     const connect = () => {
+        if (!serverUrl) return;
         if (
         wsRef.current &&
         (wsRef.current.readyState === WebSocket.OPEN ||
@@ -175,14 +212,29 @@ export default function VoiceChat() {
                 setMessages((prev) => [...prev, { role: "user", content: msg.text }]);
                 return;
             }
+            if (msg.type === "text" || msg.type === "transcript") {
+                setMessages((m) => [...m, { role: "user", content: msg.text }]);
+                return;
+            }
 
-            if (msg.type === "assistant") {
-                if (msg.text) {
-                    setMessages((prev) => [...prev, { role: "assistant", content: msg.text as string }]);
-                }
-                if (msg.audio) {
-                    enqueueAudio(msg.audio);
-                }
+            if (msg.type === "audio" || msg.type === "assistant") {
+                if (msg.text)
+                setMessages((m) => [
+                    ...m,
+                    { role: "assistant", content: msg.text as string },
+                ]);
+                const raw =
+                typeof msg.audio === "string" ? msg.audio : msg.audio?.audio ?? null;
+                if (!raw) return;
+
+                const mime = sniffAudioMime(raw); // picks audio/mpeg for MeloTTS
+                enqueueAudio(b64ToBlob(raw, mime));
+                return;
+
+                // log play() errors so you see if autoplay is blocked
+                // (see autoplay policies below)
+                //  - put this inside playNext() on the Audio element:
+                // a.play().catch(err => setStatus(`Playback blocked: ${String(err)}`));
             }
         };
         wsRef.current = ws;
@@ -221,6 +273,7 @@ export default function VoiceChat() {
 
     const onClear = () => {
         setMessages([]);
+        setStatus("");
         wsRef.current?.send(JSON.stringify({ type: "cmd", data: "clear" }));
         audioQueueRef.current = [];
         isPlayingRef.current = false;

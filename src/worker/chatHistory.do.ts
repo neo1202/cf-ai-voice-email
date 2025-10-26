@@ -28,7 +28,7 @@ export class ChatHistoryObject extends DurableObject {
             console.log(`[DO] ${this.ctx.id} 正在處理 HTTP 請求...`);
             return this.handleHttpRequest(request);
         }
-    }
+    } 
 
     // --- 這就是更新後的函式 ---
     async handleHttpRequest(request: Request): Promise<Response> {
@@ -92,6 +92,7 @@ export class ChatHistoryObject extends DurableObject {
         ws.addEventListener('message', async (event) => {
             try {
                 if (typeof event.data === 'string') {
+                    console.log(`[DO] wd message收到string而不是音訊例如cmd, clear`);
                     const { type, data } = JSON.parse(event.data);
                     if (type === 'cmd' && data === 'clear') {
                         this.msgHistory = [];
@@ -102,7 +103,7 @@ export class ChatHistoryObject extends DurableObject {
                 }
                 
                 console.log(`[DO] ${this.ctx.id} 收到音訊，大小: ${(event.data as ArrayBuffer).byteLength}，正在轉文字...`);
-
+                
                 const { text } = await this.env.AI.run('@cf/openai/whisper-tiny-en', {
                     audio: [...new Uint8Array(event.data as ArrayBuffer)],
                 });
