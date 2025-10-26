@@ -1,5 +1,5 @@
 // src/components/VoiceVisualStatus.tsx
-
+"use client";
 import { useEffect, useMemo, useRef } from "react";
 
 type Props = {
@@ -49,12 +49,20 @@ const pill = useMemo(() => {
 }, [aiSpeaking, vadLoading, listening, userSpeaking, statusText]);
 
 useEffect(() => {
+    if (mode === "mic" && (!audioContext || audioContext.state !== "running")) {
+        console.log("ahh return");
+        return;
+    }
+    if (mode === 'playback' && !playbackEl) {
+        console.log("AHHHH return");
+        return;
+    }
     let cancelled = false;
 
     async function setup() {
     const AC =
         typeof window !== "undefined" &&
-        (window.AudioContext || (window as any).webkitAudioContext);
+        (window.AudioContext || window.webkitAudioContext);
     if (!AC) return;
 
     const ac = audioContext ?? new AC();
@@ -85,10 +93,10 @@ useEffect(() => {
         src.connect(analyser);
         sourceRef.current = src;
         } else if (mode === "playback" && playbackEl) {
-        const src = ac.createMediaElementSource(playbackEl);
-        src.connect(analyser);
-        src.connect(ac.destination);
-        sourceRef.current = src;
+            const src = ac.createMediaElementSource(playbackEl);
+            src.connect(analyser);
+            src.connect(ac.destination);
+            sourceRef.current = src;
         }
     } catch (e) {
         console.warn("[VoiceVisualStatus] setup error:", e);
@@ -138,27 +146,27 @@ useEffect(() => {
     setup();
 
     return () => {
-    cancelled = true;
-    cancelAnimationFrame(rafRef.current);
-    try {
-        sourceRef.current?.disconnect();
-    } catch {}
-    try {
-        analyserRef.current?.disconnect();
-    } catch {}
-    try {
-        micStreamRef.current?.getTracks().forEach((t) => t.stop());
-    } catch {}
-    micStreamRef.current = null;
-    sourceRef.current = null;
-    analyserRef.current = null;
-
-    if (!audioContext && acRef.current) {
+        cancelled = true;
+        cancelAnimationFrame(rafRef.current);
         try {
-        acRef.current.close();
+            sourceRef.current?.disconnect();
         } catch {}
-    }
-    acRef.current = null;
+        try {
+            analyserRef.current?.disconnect();
+        } catch {}
+        try {
+            micStreamRef.current?.getTracks().forEach((t) => t.stop());
+        } catch {}
+        micStreamRef.current = null;
+        sourceRef.current = null;
+        analyserRef.current = null;
+
+        if (!audioContext && acRef.current) {
+            try {
+                acRef.current.close();
+            } catch {}
+        }
+        acRef.current = null;
     };
 }, [mode, playbackEl, audioContext]);
 

@@ -132,14 +132,25 @@ export default function VoiceChat() {
     };
 
     const connect = () => {
-        if (!serverUrl || (wsRef.current && wsRef.current.readyState === WebSocket.OPEN)) return;
+        if (
+        wsRef.current &&
+        (wsRef.current.readyState === WebSocket.OPEN ||
+            wsRef.current.readyState === WebSocket.CONNECTING)
+        )
+        return;
         
         console.log(`Connecting to: ${serverUrl}`);
         const ws = new WebSocket(serverUrl);
         ws.binaryType = "arraybuffer";
 
-        ws.onopen = () => setConnected(true);
-        ws.onclose = () => setConnected(false);
+        ws.onopen = () => {
+            setConnected(true);
+            setStatus("Connected");
+        };
+        ws.onclose = () => {
+            setConnected(false);
+            setStatus("");
+        };
         ws.onerror = () => setStatus("WebSocket error");
 
         ws.onmessage = (ev) => {
@@ -151,8 +162,12 @@ export default function VoiceChat() {
             } catch { return; }
 
             if (msg.type === "status") {
-                if (msg.text === "ready") serverReadyRef.current = true;
-                setStatus(String(msg.text ?? ""));
+                if (msg.text === "ready") {
+                    serverReadyRef.current = true;
+                    setStatus("Connected (server ready)");
+                } else {
+                    setStatus(String(msg.text ?? ""));
+                }
                 return;
             }
             
@@ -180,27 +195,18 @@ export default function VoiceChat() {
 
     const onStart = async () => {
         console.log("--- 'Start Conversation' button clicked ---");
-        console.log("1. Attempting to unlock audio context immediately...");
-        const ctx = await unlockAudio();
-        if (!ctx) {
-            // 如果在這裡失敗，我們就知道是音訊權限的根本問題
-            console.error("AudioContext unlock FAILED. This is a browser permission issue.");
-            setStatus("Error: Could not get audio permissions. Please check your browser settings.");
-            return; // 直接中斷，不往下執行
-        }
-        console.log(`2. AudioContext unlocked successfully! State: ${ctx.state}`);
-        setAudioCtx(ctx);
-        connect();
+        connect(); // creates wsRef.current
+        await waitForOpen(wsRef.current!);
         try {
-            await waitForOpen(wsRef.current!);
             await waitFor(() => serverReadyRef.current, "server ready", 2500);
             await waitFor(() => !vad.loading, "VAD load", 15000);
             
-            // const ctx = await unlockAudio();
-            // if (ctx) setAudioCtx(ctx);
+            const ctx = await unlockAudio();
+            if (ctx) setAudioCtx(ctx);
             
             vad.start();
             setListening(true);
+            setStatus("Listening…");
         } catch (err) {
             console.error("Failed to start conversation:", err);
             setStatus((err as Error).message);
@@ -210,6 +216,7 @@ export default function VoiceChat() {
     const onStop = () => {
         vad.pause();
         setListening(false);
+        setStatus("");
     };
 
     const onClear = () => {
@@ -248,6 +255,7 @@ export default function VoiceChat() {
             vad.pause();
             disconnect();
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // ... JSX 部分保持不變 ...
