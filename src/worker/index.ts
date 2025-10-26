@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
+import type { Context, Next } from 'hono';
 // 使用 Hono，並綁定 Env 類型
 const app = new Hono<{ Bindings: Env }>();
-const setCoopCoepHeaders = (c, next) => {
+const setCoopCoepHeaders = async (c: Context, next: Next) => {
     c.res.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
     c.res.headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
     return next();
