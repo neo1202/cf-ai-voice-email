@@ -1,7 +1,14 @@
 import { Hono } from 'hono';
 // 使用 Hono，並綁定 Env 類型
 const app = new Hono<{ Bindings: Env }>();
+const setCoopCoepHeaders = (c, next) => {
+    c.res.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+    c.res.headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
+    return next();
+};
 
+// 1. 將中介軟體套用在所有路由之前
+app.use(setCoopCoepHeaders);
 // 設置一個路由來處理所有 /chat/:sessionId 的請求
 app.all('/chat/:sessionId', async (c) => {
     

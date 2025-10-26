@@ -24,10 +24,10 @@ export default defineConfig({
             // 如果您有其他 API 路由，也可以在這裡添加
         },
     },
-    optimizeDeps: {
-        include: [
-            '@ricky0123/vad-react',
-            'onnxruntime-web',
-        ],
-    },
+    // optimizeDeps: {
+    //     include: [
+    //         '@ricky0123/vad-react',
+    //         'onnxruntime-web',
+    //     ],
+    // },
 });
