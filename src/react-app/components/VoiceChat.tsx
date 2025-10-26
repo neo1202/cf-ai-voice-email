@@ -206,6 +206,30 @@ export default function VoiceChat() {
         audioQueueRef.current = [];
         isPlayingRef.current = false;
     };
+    const onNewConversation = () => {
+        // 1. 停止所有正在進行的活動
+        onStop();
+        if (playbackEl) playbackEl.pause();
+        setAiSpeaking(false);
+        audioQueueRef.current = [];
+        isPlayingRef.current = false;
+        
+        // 2. 斷開當前的 WebSocket 連線
+        disconnect();
+
+        // 3. 清除前端顯示的訊息
+        setMessages([]);
+
+        // 4. 核心步驟：移除舊 session ID 並生成一個新的
+        localStorage.removeItem("sessionId");
+        const newSessionId = getSessionId(); // getSessionId 會自動創建並儲存新的 ID
+        setSessionId(newSessionId);
+
+        // 5. 重設狀態，準備好下一次對話
+        setStatus("Ready for a new conversation.");
+        serverReadyRef.current = false; // 重設伺服器就緒狀態
+        console.log(`✨ New session started with ID: ${newSessionId}`);
+    };
 
     useEffect(() => {
         return () => {
@@ -285,13 +309,25 @@ export default function VoiceChat() {
             >
             Stop Conversation
             </button>
-    
-            <button
-            onClick={onClear}
-            className="ml-auto rounded-lg px-4 py-2 font-medium bg-gray-700 text-white shadow hover:bg-gray-800 active:scale-95"
-            >
-            Clear Chat
-            </button>
+
+            <div className="ml-auto flex items-center gap-3">
+            {/* 按鈕 1: 清除當前對話 */}
+                <button
+                    onClick={onClear}
+                    className="rounded-lg px-4 py-2 font-medium bg-yellow-600 text-white shadow hover:bg-yellow-700 active:scale-95"
+                >
+                    Clear Chat
+                </button>
+
+                {/* 按鈕 2: 開始全新對話 */}
+                <button
+                    onClick={onNewConversation}
+                    className="rounded-lg px-4 py-2 font-medium bg-gray-700 text-white shadow hover:bg-gray-800 active:scale-95"
+                >
+                    New Conversation
+                </button>
+            </div>
+            
     
             <span
             className={`text-xs ${
