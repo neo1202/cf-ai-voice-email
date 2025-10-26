@@ -14,15 +14,15 @@
     "migrations": [
         {
             "new_sqlite_classes": ["ChatHistoryObject"],
-            "tag": "v1",
+            "tag": "v1"
         }
     ],
     "durable_objects": {
         "bindings": [
             {
             "class_name": "ChatHistoryObject",
-            "name": "CHAT_HISTORY",
-            },
-        ],
-    },
+            "name": "CHAT_HISTORY"
+            }
+        ]
+    }
 }
