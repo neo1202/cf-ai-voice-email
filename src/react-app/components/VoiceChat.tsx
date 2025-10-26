@@ -208,10 +208,6 @@ export default function VoiceChat() {
                 return;
             }
             
-            if (msg.type === "transcript") {
-                setMessages((prev) => [...prev, { role: "user", content: msg.text }]);
-                return;
-            }
             if (msg.type === "text" || msg.type === "transcript") {
                 setMessages((m) => [...m, { role: "user", content: msg.text }]);
                 return;
