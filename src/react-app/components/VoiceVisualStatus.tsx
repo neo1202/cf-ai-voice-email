@@ -49,14 +49,14 @@ const pill = useMemo(() => {
 }, [aiSpeaking, vadLoading, listening, userSpeaking, statusText]);
 
 useEffect(() => {
-    // if (mode === "mic" && (!audioContext || audioContext.state !== "running")) {
-    //     console.log("ahh return");
-    //     return;
-    // }
-    // if (mode === 'playback' && !playbackEl) {
-    //     console.log("AHHHH return");
-    //     return;
-    // }
+    if (mode === "mic" && (!audioContext || audioContext.state !== "running")) {
+        console.log("ahh return");
+        return;
+    }
+    if (mode === 'playback' && !playbackEl) {
+        console.log("AHHHH return");
+        return;
+    }
     let cancelled = false;
 
     async function setup() {
