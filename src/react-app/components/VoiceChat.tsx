@@ -53,6 +53,7 @@ export default function VoiceChat() {
     const serverUrl = useMemo(() => {
         if (typeof window === "undefined" || !sessionId) return "";
         const proto = location.protocol === "https:" ? "wss" : "ws";
+        console.log(`${proto}://${import.meta.env.VITE_WS_HOST}/chat/${sessionId}`);
         return `${proto}://${import.meta.env.VITE_WS_HOST}/chat/${sessionId}`;
     }, [sessionId]);
 
@@ -178,14 +179,25 @@ export default function VoiceChat() {
     };
 
     const onStart = async () => {
+        console.log("--- 'Start Conversation' button clicked ---");
+        console.log("1. Attempting to unlock audio context immediately...");
+        const ctx = await unlockAudio();
+        if (!ctx) {
+            // 如果在這裡失敗，我們就知道是音訊權限的根本問題
+            console.error("AudioContext unlock FAILED. This is a browser permission issue.");
+            setStatus("Error: Could not get audio permissions. Please check your browser settings.");
+            return; // 直接中斷，不往下執行
+        }
+        console.log(`2. AudioContext unlocked successfully! State: ${ctx.state}`);
+        setAudioCtx(ctx);
         connect();
         try {
             await waitForOpen(wsRef.current!);
             await waitFor(() => serverReadyRef.current, "server ready", 2500);
             await waitFor(() => !vad.loading, "VAD load", 15000);
             
-            const ctx = await unlockAudio();
-            if (ctx) setAudioCtx(ctx);
+            // const ctx = await unlockAudio();
+            // if (ctx) setAudioCtx(ctx);
             
             vad.start();
             setListening(true);

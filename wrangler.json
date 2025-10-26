@@ -15,7 +15,7 @@
         {
             "new_sqlite_classes": ["ChatHistoryObject"],
             "tag": "v1",
-        },
+        }
     ],
     "durable_objects": {
         "bindings": [
