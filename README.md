@@ -81,10 +81,7 @@ npm install
 npm run dev
 
 # Start development server (backend)
-npm run dev:worker
-
-# Run both concurrently
-npm run dev:full
+npx wrangler dev
 ```
 
 Your application will be available at:
@@ -134,7 +131,7 @@ VITE_WS_HOST=your-worker-domain.workers.dev
 
 ### Wrangler Configuration
 
-The `wrangler.toml` file contains all necessary configurations for:
+The `wrangler.json` file contains all necessary configurations for:
 - Durable Objects bindings
 - AI service integration
 - Static asset serving
@@ -145,11 +142,6 @@ The `wrangler.toml` file contains all necessary configurations for:
 ### WebSocket Endpoints
 
 - `wss://your-domain/chat/{sessionId}` - Main conversation endpoint
-
-### HTTP Endpoints
-
-- `GET /health` - Health check endpoint
-- `POST /api/config` - Configuration retrieval
 
 ### Message Types
 
@@ -175,12 +167,6 @@ The `wrangler.toml` file contains all necessary configurations for:
 ### Testing
 
 ```bash
-# Run type checking
-npm run type-check
-
-# Test local deployment
-wrangler dev --local
-
 # Monitor production logs
 wrangler tail
 ```
