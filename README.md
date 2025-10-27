@@ -6,6 +6,7 @@
 [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com/)
 
 A modern, low-latency, real-time voice conversation application built entirely on the Cloudflare ecosystem, featuring seamless AI-powered speech interactions with persistent conversation history.
+![screenshot](./public/pic.png)
 
 ## Overview
 
